@@ -19,13 +19,7 @@ let selectedEnchants = new Set();
 const ENCHANT_GROUPS = {
     damage: ['sharpness', 'smite', 'bane_of_arthropods'],
     protection: ['protection', 'fire_protection', 'blast_protection', 'projectile_protection'],
-    depth: ['depth_strider', 'frost_walker'],
-    bow_power: ['power'],
-    bow_utility: ['punch', 'flame', 'infinity'],
-    crossbow_shot: ['multishot', 'piercing'],
-    crossbow_charge: ['quick_charge'],
-    trident_return: ['loyalty', 'riptide'],
-    rod_fishing: ['lure', 'luck_of_the_sea']
+    depth: ['depth_strider', 'frost_walker']
 };
 
 // Curse enchantments - don't include in "All Enchants"
@@ -104,7 +98,7 @@ function populateEnchantments() {
     });
 }
 
-// Handle enchant button click
+// Handle enchant button click - NO RESTRICTIONS
 function handleEnchantSelect(e) {
     e.preventDefault();
     
@@ -115,23 +109,7 @@ function handleEnchantSelect(e) {
         selectedEnchants.delete(enchant);
         e.target.classList.remove('active');
     } else {
-        // When selecting an enchantment, deselect conflicting ones in the same group
-        const groupKey = Object.keys(ENCHANT_GROUPS).find(key => 
-            ENCHANT_GROUPS[key].includes(enchant)
-        );
-        
-        if (groupKey) {
-            const groupEnchants = ENCHANT_GROUPS[groupKey];
-            groupEnchants.forEach(groupEnchant => {
-                if (groupEnchant !== enchant && selectedEnchants.has(groupEnchant)) {
-                    selectedEnchants.delete(groupEnchant);
-                    const btn = document.querySelector(`[data-enchant="${groupEnchant}"]`);
-                    if (btn) btn.classList.remove('active');
-                }
-            });
-        }
-        
-        // Select
+        // Select - NO RESTRICTIONS in grid
         selectedEnchants.add(enchant);
         e.target.classList.add('active');
     }
@@ -140,7 +118,7 @@ function handleEnchantSelect(e) {
     generateCommand();
 }
 
-// Handle All Enchants button
+// Handle All Enchants button - RESPECTS RULES
 function handleAllEnchants(e) {
     if (!selectedItem) {
         alert('Please select an item first');
