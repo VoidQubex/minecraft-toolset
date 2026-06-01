@@ -3,9 +3,8 @@ const itemsGrid = document.getElementById('itemsGrid');
 const itemSearchInput = document.getElementById('itemSearch');
 const countInput = document.getElementById('count');
 const searchEnchantInput = document.getElementById('searchEnchant');
-const allEnchantsCheck = document.getElementById('allEnchantsCheck');
+const allEnchantsBtn = document.getElementById('allEnchantsBtn');
 const enchantGrid = document.getElementById('enchantGrid');
-const commandForm = document.getElementById('commandForm');
 const outputSection = document.getElementById('outputSection');
 const commandText = document.getElementById('commandText');
 const itemCountStat = document.getElementById('itemCount');
@@ -40,13 +39,13 @@ function init() {
     setupEventListeners();
 }
 
-// Populate items grid
+// Populate items grid with buttons
 function populateItems() {
     const sortedItems = [...MINECRAFT_ITEMS].sort();
     sortedItems.forEach(item => {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'item-button';
+        button.className = 'item-btn';
         button.textContent = formatItemName(item);
         button.dataset.item = item;
         button.addEventListener('click', handleItemSelect);
@@ -61,7 +60,7 @@ function handleItemSelect(e) {
     const item = e.target.dataset.item;
     
     // Remove active class from previous selection
-    document.querySelectorAll('.item-button.active').forEach(btn => {
+    document.querySelectorAll('.item-btn.active').forEach(btn => {
         btn.classList.remove('active');
     });
     
@@ -71,18 +70,18 @@ function handleItemSelect(e) {
     
     // Reset enchantments when item changes
     selectedEnchants.clear();
-    allEnchantsCheck.checked = false;
-    document.querySelectorAll('#enchantGrid input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = false;
+    document.querySelectorAll('.enchant-btn.active').forEach(btn => {
+        btn.classList.remove('active');
     });
     
     updateStats();
+    generateCommand();
 }
 
 // Handle item search
 function handleItemSearch(e) {
     const query = e.target.value.toLowerCase();
-    document.querySelectorAll('#itemsGrid .item-button').forEach(btn => {
+    document.querySelectorAll('#itemsGrid .item-btn').forEach(btn => {
         const itemName = btn.textContent.toLowerCase();
         if (itemName.includes(query)) {
             btn.style.display = '';
@@ -92,35 +91,31 @@ function handleItemSearch(e) {
     });
 }
 
-// Populate enchantments grid
+// Populate enchantments grid with buttons
 function populateEnchantments() {
     Object.keys(MINECRAFT_ENCHANTMENTS).forEach(enchant => {
-        const enchantData = MINECRAFT_ENCHANTMENTS[enchant];
-        const container = document.createElement('div');
-        container.className = 'enchant-item';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = `enchant_${enchant}`;
-        checkbox.value = enchant;
-        checkbox.addEventListener('change', handleEnchantChange);
-        
-        const label = document.createElement('label');
-        label.htmlFor = `enchant_${enchant}`;
-        label.textContent = formatEnchantName(enchant);
-        
-        container.appendChild(checkbox);
-        container.appendChild(label);
-        enchantGrid.appendChild(container);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'enchant-btn';
+        button.textContent = formatEnchantName(enchant);
+        button.dataset.enchant = enchant;
+        button.addEventListener('click', handleEnchantSelect);
+        enchantGrid.appendChild(button);
     });
 }
 
-// Handle enchant checkbox changes
-function handleEnchantChange(e) {
-    const enchant = e.target.value;
+// Handle enchant button click
+function handleEnchantSelect(e) {
+    e.preventDefault();
     
-    if (e.target.checked) {
-        // When checking an enchantment, uncheck conflicting ones in the same group
+    const enchant = e.target.dataset.enchant;
+    
+    if (selectedEnchants.has(enchant)) {
+        // Deselect
+        selectedEnchants.delete(enchant);
+        e.target.classList.remove('active');
+    } else {
+        // When selecting an enchantment, deselect conflicting ones in the same group
         const groupKey = Object.keys(ENCHANT_GROUPS).find(key => 
             ENCHANT_GROUPS[key].includes(enchant)
         );
@@ -128,78 +123,75 @@ function handleEnchantChange(e) {
         if (groupKey) {
             const groupEnchants = ENCHANT_GROUPS[groupKey];
             groupEnchants.forEach(groupEnchant => {
-                if (groupEnchant !== enchant) {
-                    const checkbox = document.getElementById(`enchant_${groupEnchant}`);
-                    if (checkbox && checkbox.checked) {
-                        checkbox.checked = false;
-                        selectedEnchants.delete(groupEnchant);
-                    }
+                if (groupEnchant !== enchant && selectedEnchants.has(groupEnchant)) {
+                    selectedEnchants.delete(groupEnchant);
+                    const btn = document.querySelector(`[data-enchant="${groupEnchant}"]`);
+                    if (btn) btn.classList.remove('active');
                 }
             });
         }
         
+        // Select
         selectedEnchants.add(enchant);
-    } else {
-        selectedEnchants.delete(enchant);
+        e.target.classList.add('active');
     }
     
     updateStats();
-    allEnchantsCheck.checked = false;
+    generateCommand();
 }
 
-// Handle All Enchants checkbox
-function handleAllEnchantsChange(e) {
+// Handle All Enchants button
+function handleAllEnchants(e) {
     if (!selectedItem) {
         alert('Please select an item first');
-        e.target.checked = false;
         return;
     }
 
-    if (e.target.checked) {
-        // Get applicable enchants for the selected item
-        const applicableEnchants = getApplicableEnchants(selectedItem);
+    // Get applicable enchants for the selected item
+    const applicableEnchants = getApplicableEnchants(selectedItem);
+    
+    // Filter out curses and keep only one from each mutually exclusive group
+    const selectedByGroup = {};
+    selectedEnchants.clear();
+    
+    // Clear all active buttons
+    document.querySelectorAll('.enchant-btn.active').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    applicableEnchants.forEach(enchant => {
+        // Skip curses
+        if (CURSES.includes(enchant)) return;
         
-        // Filter out curses and keep only one from each mutually exclusive group
-        const selectedByGroup = {};
+        // Find the group this enchant belongs to
+        const groupKey = Object.keys(ENCHANT_GROUPS).find(key => 
+            ENCHANT_GROUPS[key].includes(enchant)
+        );
         
-        applicableEnchants.forEach(enchant => {
-            // Skip curses
-            if (CURSES.includes(enchant)) return;
-            
-            // Find the group this enchant belongs to
-            const groupKey = Object.keys(ENCHANT_GROUPS).find(key => 
-                ENCHANT_GROUPS[key].includes(enchant)
-            );
-            
-            // Only add if we haven't added another from this group yet
-            if (!groupKey || !selectedByGroup[groupKey]) {
-                selectedEnchants.add(enchant);
-                if (groupKey) {
-                    selectedByGroup[groupKey] = enchant;
-                }
-                document.getElementById(`enchant_${enchant}`).checked = true;
+        // Only add if we haven't added another from this group yet
+        if (!groupKey || !selectedByGroup[groupKey]) {
+            selectedEnchants.add(enchant);
+            if (groupKey) {
+                selectedByGroup[groupKey] = enchant;
             }
-        });
-    } else {
-        // Clear all enchants
-        selectedEnchants.forEach(enchant => {
-            document.getElementById(`enchant_${enchant}`).checked = false;
-        });
-        selectedEnchants.clear();
-    }
+            const btn = document.querySelector(`[data-enchant="${enchant}"]`);
+            if (btn) btn.classList.add('active');
+        }
+    });
     
     updateStats();
+    generateCommand();
 }
 
 // Handle enchantment search
 function handleEnchantSearch(e) {
     const query = e.target.value.toLowerCase();
-    document.querySelectorAll('#enchantGrid .enchant-item').forEach(item => {
-        const label = item.querySelector('label').textContent.toLowerCase();
+    document.querySelectorAll('#enchantGrid .enchant-btn').forEach(btn => {
+        const label = btn.textContent.toLowerCase();
         if (label.includes(query)) {
-            item.style.display = '';
+            btn.style.display = '';
         } else {
-            item.style.display = 'none';
+            btn.style.display = 'none';
         }
     });
 }
@@ -238,11 +230,11 @@ function formatEnchantName(enchant) {
         .join(' ');
 }
 
-// Generate the give command with correct syntax
+// Generate the give command with correct syntax - AUTO CALLED
 function generateCommand() {
     if (!selectedItem) {
-        alert('Please select an item');
-        return null;
+        outputSection.classList.remove('active');
+        return;
     }
 
     const count = parseInt(countInput.value) || 1;
@@ -263,16 +255,7 @@ function generateCommand() {
         command += `[enchantments={${enchantments.join(', ')}}]`;
     }
 
-    return command;
-}
-
-// Handle form submission
-function handleFormSubmit(e) {
-    e.preventDefault();
-    
-    const command = generateCommand();
-    if (!command) return;
-    
+    // Display the command
     commandText.textContent = command;
     outputSection.classList.add('active');
 }
@@ -293,34 +276,35 @@ function copyCommand() {
     });
 }
 
+// Reset form
+function resetForm() {
+    selectedItem = null;
+    selectedEnchants.clear();
+    document.querySelectorAll('.item-btn.active').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelectorAll('.enchant-btn.active').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    itemSearchInput.value = '';
+    searchEnchantInput.value = '';
+    countInput.value = '1';
+    document.querySelectorAll('#itemsGrid .item-btn').forEach(btn => {
+        btn.style.display = '';
+    });
+    document.querySelectorAll('#enchantGrid .enchant-btn').forEach(btn => {
+        btn.style.display = '';
+    });
+    outputSection.classList.remove('active');
+    updateStats();
+}
+
 // Setup event listeners
 function setupEventListeners() {
-    commandForm.addEventListener('submit', handleFormSubmit);
-    allEnchantsCheck.addEventListener('change', handleAllEnchantsChange);
+    allEnchantsBtn.addEventListener('click', handleAllEnchants);
     searchEnchantInput.addEventListener('input', handleEnchantSearch);
     itemSearchInput.addEventListener('input', handleItemSearch);
-    
-    // Reset form
-    commandForm.addEventListener('reset', () => {
-        selectedItem = null;
-        selectedEnchants.clear();
-        document.querySelectorAll('.item-button.active').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.querySelectorAll('#enchantGrid input[type="checkbox"]').forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        itemSearchInput.value = '';
-        searchEnchantInput.value = '';
-        document.querySelectorAll('#itemsGrid .item-button').forEach(btn => {
-            btn.style.display = '';
-        });
-        document.querySelectorAll('#enchantGrid .enchant-item').forEach(item => {
-            item.style.display = '';
-        });
-        outputSection.classList.remove('active');
-        updateStats();
-    });
+    countInput.addEventListener('change', generateCommand);
 }
 
 // Initialize on page load
