@@ -15,6 +15,22 @@ const selectedEnchantsStat = document.getElementById('selectedEnchants');
 let selectedItem = null;
 let selectedEnchants = new Set();
 
+// Enchantment groups - enchants in same group are mutually exclusive
+const ENCHANT_GROUPS = {
+    damage: ['sharpness', 'smite', 'bane_of_arthropods'],
+    protection: ['protection', 'fire_protection', 'blast_protection', 'projectile_protection'],
+    depth: ['depth_strider', 'frost_walker'],
+    bow_power: ['power'],
+    bow_utility: ['punch', 'flame', 'infinity'],
+    crossbow_shot: ['multishot', 'piercing'],
+    crossbow_charge: ['quick_charge'],
+    trident_return: ['loyalty', 'riptide'],
+    rod_fishing: ['lure', 'luck_of_the_sea']
+};
+
+// Curse enchantments - don't include in "All Enchants"
+const CURSES = ['curse_of_vanishing', 'curse_of_binding'];
+
 // Initialize the application
 function init() {
     populateItems();
@@ -57,20 +73,6 @@ function handleItemSelect(e) {
     allEnchantsCheck.checked = false;
     document.querySelectorAll('#enchantGrid input[type="checkbox"]').forEach(checkbox => {
         checkbox.checked = false;
-        checkbox.disabled = false;
-    });
-
-    // Disable non-applicable enchants
-    const applicableEnchants = getApplicableEnchants(selectedItem);
-    document.querySelectorAll('#enchantGrid input[type="checkbox"]').forEach(checkbox => {
-        checkbox.disabled = !applicableEnchants.includes(checkbox.value);
-        if (checkbox.disabled) {
-            checkbox.parentElement.style.opacity = '0.4';
-            checkbox.parentElement.style.pointerEvents = 'none';
-        } else {
-            checkbox.parentElement.style.opacity = '1';
-            checkbox.parentElement.style.pointerEvents = 'auto';
-        }
     });
     
     updateStats();
@@ -101,25 +103,68 @@ function populateEnchantments() {
 
 // Handle enchant checkbox changes
 function handleEnchantChange(e) {
+    const enchant = e.target.value;
+    
     if (e.target.checked) {
-        selectedEnchants.add(e.target.value);
+        // When checking an enchantment, uncheck conflicting ones in the same group
+        const groupKey = Object.keys(ENCHANT_GROUPS).find(key => 
+            ENCHANT_GROUPS[key].includes(enchant)
+        );
+        
+        if (groupKey) {
+            const groupEnchants = ENCHANT_GROUPS[groupKey];
+            groupEnchants.forEach(groupEnchant => {
+                if (groupEnchant !== enchant) {
+                    const checkbox = document.getElementById(`enchant_${groupEnchant}`);
+                    if (checkbox && checkbox.checked) {
+                        checkbox.checked = false;
+                        selectedEnchants.delete(groupEnchant);
+                    }
+                }
+            });
+        }
+        
+        selectedEnchants.add(enchant);
     } else {
-        selectedEnchants.delete(e.target.value);
+        selectedEnchants.delete(enchant);
     }
+    
     updateStats();
     allEnchantsCheck.checked = false;
 }
 
 // Handle All Enchants checkbox
 function handleAllEnchantsChange(e) {
-    if (!selectedItem) return;
+    if (!selectedItem) {
+        alert('Please select an item first');
+        e.target.checked = false;
+        return;
+    }
 
     if (e.target.checked) {
         // Get applicable enchants for the selected item
         const applicableEnchants = getApplicableEnchants(selectedItem);
+        
+        // Filter out curses and keep only one from each mutually exclusive group
+        const selectedByGroup = {};
+        
         applicableEnchants.forEach(enchant => {
-            selectedEnchants.add(enchant);
-            document.getElementById(`enchant_${enchant}`).checked = true;
+            // Skip curses
+            if (CURSES.includes(enchant)) return;
+            
+            // Find the group this enchant belongs to
+            const groupKey = Object.keys(ENCHANT_GROUPS).find(key => 
+                ENCHANT_GROUPS[key].includes(enchant)
+            );
+            
+            // Only add if we haven't added another from this group yet
+            if (!groupKey || !selectedByGroup[groupKey]) {
+                selectedEnchants.add(enchant);
+                if (groupKey) {
+                    selectedByGroup[groupKey] = enchant;
+                }
+                document.getElementById(`enchant_${enchant}`).checked = true;
+            }
         });
     } else {
         // Clear all enchants
@@ -128,6 +173,7 @@ function handleAllEnchantsChange(e) {
         });
         selectedEnchants.clear();
     }
+    
     updateStats();
 }
 
@@ -248,9 +294,6 @@ function setupEventListeners() {
         });
         document.querySelectorAll('#enchantGrid input[type="checkbox"]').forEach(checkbox => {
             checkbox.checked = false;
-            checkbox.disabled = false;
-            checkbox.parentElement.style.opacity = '1';
-            checkbox.parentElement.style.pointerEvents = 'auto';
         });
         searchEnchantInput.value = '';
         document.querySelectorAll('#enchantGrid .enchant-item').forEach(item => {
