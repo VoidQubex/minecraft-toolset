@@ -1,5 +1,6 @@
 // DOM Elements
 const itemsGrid = document.getElementById('itemsGrid');
+const itemSearchInput = document.getElementById('itemSearch');
 const countInput = document.getElementById('count');
 const searchEnchantInput = document.getElementById('searchEnchant');
 const allEnchantsCheck = document.getElementById('allEnchantsCheck');
@@ -76,6 +77,19 @@ function handleItemSelect(e) {
     });
     
     updateStats();
+}
+
+// Handle item search
+function handleItemSearch(e) {
+    const query = e.target.value.toLowerCase();
+    document.querySelectorAll('#itemsGrid .item-button').forEach(btn => {
+        const itemName = btn.textContent.toLowerCase();
+        if (itemName.includes(query)) {
+            btn.style.display = '';
+        } else {
+            btn.style.display = 'none';
+        }
+    });
 }
 
 // Populate enchantments grid
@@ -284,6 +298,7 @@ function setupEventListeners() {
     commandForm.addEventListener('submit', handleFormSubmit);
     allEnchantsCheck.addEventListener('change', handleAllEnchantsChange);
     searchEnchantInput.addEventListener('input', handleEnchantSearch);
+    itemSearchInput.addEventListener('input', handleItemSearch);
     
     // Reset form
     commandForm.addEventListener('reset', () => {
@@ -295,7 +310,11 @@ function setupEventListeners() {
         document.querySelectorAll('#enchantGrid input[type="checkbox"]').forEach(checkbox => {
             checkbox.checked = false;
         });
+        itemSearchInput.value = '';
         searchEnchantInput.value = '';
+        document.querySelectorAll('#itemsGrid .item-button').forEach(btn => {
+            btn.style.display = '';
+        });
         document.querySelectorAll('#enchantGrid .enchant-item').forEach(item => {
             item.style.display = '';
         });
